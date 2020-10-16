@@ -1,34 +1,38 @@
-## inPack Spec Define
+## inPack Spec 定义
 
-inPack Spec 配置以文本形式放置在项目根目录的指定位置: project/inpack.spec 或 project/misc/inpack/inpack.spec , 打包程序会自动在这两个位置读取 inpack.spec 并作后续操作.
+inPack Spec 数据规范定义基于 [TOML](https://github.com/toml-lang/toml) 文本格式放置在项目根目录的指定位置: ```./inpack.toml``` 或 ```./misc/inpack/inpack.toml```, 打包程序会自动在这两个位置读取 inpack.toml 并作后续操作.
 
-一个标准的 inpack.spec 文件可以参考一个 nginx inpack.spec 实例，如下:
+一个标准的 inpack.toml 文件可以参考一个 nginx inpack.toml 实例，如下:
 
-``` shell
+``` toml
 [project]
-name = nginx
-version = 1.12.2
-vendor = nginx.org
-homepage = http://nginx.org/
-groups = dev/sys-srv
-description = High Performance Load Balancer, Web Server, Reverse Proxy
+name = "nginx"
+version = "1.18"
+vendor = "nginx.org"
+homepage = "http://nginx.org/"
+description = "High Performance Load Balancer, Web Server, Reverse Proxy"
+groups = ["dev/sys-srv"]
 
-%build
+[files]
 
-PREFIX="{{.project__prefix}}"
+[scripts]
+build = """
+PREFIX=\"/opt/nginx/nginx\"
 
 cd {{.inpack__pack_dir}}/deps
 
-if [ ! -f "nginx-{{.project__version}}.tar.gz" ]; then
+if [ ! -f \"nginx-{{.project__version}}.tar.gz\" ]; then
     wget http://nginx.org/download/nginx-{{.project__version}}.tar.gz
 fi
-if [ -d "nginx-{{.project__version}}" ]; then
+
+if [ -d \"nginx-{{.project__version}}\" ]; then
     rm -rf nginx-{{.project__version}}
 fi
+
 tar -zxf nginx-{{.project__version}}.tar.gz
 
-
 cd nginx-{{.project__version}}
+
 ./configure \
     --user=action \
     --group=action \
@@ -76,44 +80,37 @@ des_tmp=/tmp/nginx_build_tmp
 mkdir -p $des_tmp
 make install DESTDIR=$des_tmp
 
-
 rm -rf   {{.buildroot}}/*
 cp -rp   $des_tmp/$PREFIX/* {{.buildroot}}/
-
 strip -s {{.buildroot}}/bin/nginx
-
 rm -f    {{.buildroot}}/bin/nginx.old
-
 mkdir -p {{.buildroot}}/conf/conf.d/
 mkdir -p {{.buildroot}}/modules
 mkdir -p {{.buildroot}}/var/cache/nginx/{client_temp,proxy_temp,fastcgi_temp,uwsgi_temp,scgi_temp}
 
 cd {{.inpack__pack_dir}}
-
 install misc/nginx.conf.tpl             {{.buildroot}}/conf/nginx.conf
-
-sed -i 's/{\[worker_processes\]}/1/g'             {{.buildroot}}/conf/nginx.conf
-sed -i 's/{\[events_worker_connections\]}/8192/g' {{.buildroot}}/conf/nginx.conf
-sed -i 's/{\[http_server_default_listen\]}/80/g'  {{.buildroot}}/conf/nginx.conf
+sed -i 's/{\\[worker_processes\\]}/1/g'             {{.buildroot}}/conf/nginx.conf
+sed -i 's/{\\[events_worker_connections\\]}/8192/g' {{.buildroot}}/conf/nginx.conf
+sed -i 's/{\\[http_server_default_listen\\]}/80/g'  {{.buildroot}}/conf/nginx.conf
 
 cd {{.inpack__pack_dir}}/deps
 rm -rf nginx-{{.project__version}}
-
-%files
+"""
 ```
 
-### inpack.spec - project
+### project
 
 **[project]** 标识定义包的基本信息，比如包名,版本号,描述等等,...
 
-``` shell
+``` toml
 [project]
-name = nginx
-version = 1.12.2
-vendor = nginx.org
-homepage = http://nginx.org/
-groups = dev/sys-srv
-description = High Performance Load Balancer, Web Server, Reverse Proxy
+name = "nginx"
+version = "1.18"
+vendor = "nginx.org"
+homepage = "http://nginx.org/"
+description = "High Performance Load Balancer, Web Server, &amp; Reverse Proxy"
+groups = ["dev/sys-srv"]
 ```
 
 其中 groups 为 inPack 的分类标识，完整的定义清单如下:
@@ -134,10 +131,13 @@ dev/sys-srv | System Server or Service
 dev/sys-runtime | System Runtime Environments
 dev/other | Dev Others
 
-### inpack.spec - build
-**%build** 标识定义编译脚本,　如
-``` shell
-%build
+### scripts
+
+**[sciprts]/build** 标识定义编译脚本,　如
+
+``` toml
+[scripts]
+build = """
 PREFIX="{{.project__prefix}}"
 
 cd {{.inpack__pack_dir}}/deps
@@ -145,7 +145,9 @@ cd {{.inpack__pack_dir}}/deps
 ./configure --prefix=/home/action/apps/nginx
 make -j4
 ... ...
+"""
 ```
+
 在 build 脚本块中，包含动态模版参数，格式为 ```{{.var_name}}```, 其完整的参数清单如下:
 
 Name | Description
@@ -159,10 +161,59 @@ project__arch | 当前打包环境的硬件架构，固定为 x64 (即 x86_64或
 project__prefix | 项目安装的默认根路径，部分软件在运行时依赖这个参数，在 sysinner 系统下统一设置为 /home/action/apps/project-name
 
 
-### inpack.spec - files
-**%files** 标识定义静态文件,　用于批量复制相同路径的文件到目标包，一般用于静态文件，或者不需要编译的脚本类文件,如
-``` shell
-%files
-/public/static/
-/libs/
+### files
+
+**[files]** 用于批量复制静态文件到目标包，或压缩静态文件(css,js,html,...) 如
+
+
+
+``` toml
+[files]
+
+# 用于批量复制文件到目标包
+allow = """
+i18n/
+webui/
+"""
+
+# 压缩js文件
+
+js_commpress = """
+webui/bootstrap/js/
+webui/jquery/js/
+"""
+
+# 压缩 css 文件
+css_compress = """
+webui/bootstrap/css/
+"""
+
+# 压缩 html 文件
+html_compress = """
+websrv/frontend/views/
+"""
 ```
+
+
+注: 与压缩静态文件有关的逻辑需要安装依赖软件
+
+#### CentOS, RHEL
+
+``` shell
+yum install -y npm optipng upx
+
+npm install -g uglify-js clean-css-cli html-minifier esformatter js-beautify
+```
+
+#### Ubuntu
+
+``` shell
+sudo apt-get install -y npm optipng upx
+
+npm install -g uglify-js clean-css-cli html-minifier esformatter js-beautify
+```
+
+### 更多实例
+
+我们将常用的开源项目打包脚本汇总在 [https://github.com/inpack/](https://github.com/inpack/), 你可以直接使用，或者以此为模板修改.
+

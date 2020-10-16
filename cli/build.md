@@ -19,7 +19,7 @@ Building
 
 ```
 
-成功执行后, nginx-1.12.2-1.el7.x64.txz 就是最终的包文件 (下一步将使用 inpack push 将这个包推送到 inpack-server)
+成功执行后, nginx-1.12.2-1.el7.x64.txz 就是最终的包文件 (下一步将使用 [inpack push](cli/push.md) 将这个包推送到 inpack-server)
 
 > 如果build失败，可能是本地缺少必要的依赖库: yum install readline-devel pcre-devel openssl-devel gcc curl
 
